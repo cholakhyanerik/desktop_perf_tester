@@ -3,7 +3,7 @@ use chrono::Local;
 use plotters::prelude::*;
 use serde::Serialize;
 use std::fs;
-use std::path::Path; // Добавлено!
+use std::path::Path;
 
 use crate::metrics_collector::AppMetrics;
 
@@ -37,7 +37,6 @@ impl ReportGenerator {
         self.generate_comparison("reports/comparison.md", data1, data2)?;
         self.generate_json("reports/full_report.json", data1, data2)?;
 
-        // ГЕНЕРАЦИЯ ВСЕХ 6 ГРАФИКОВ (Добавлены GPU и Network)
         self.draw_metric_chart("reports/cpu_comparison.png", "CPU Usage (%)", data1, data2, |m| m.cpu_usage, Some(100.0))?;
         self.draw_metric_chart("reports/ram_comparison.png", "RAM Usage (MB)", data1, data2, |m| m.ram_usage as f32, None)?;
         self.draw_metric_chart("reports/disk_read_comparison.png", "Disk Read (B/s)", data1, data2, |m| m.disk_read as f32, None)?;
@@ -45,7 +44,6 @@ impl ReportGenerator {
         self.draw_metric_chart("reports/gpu_comparison.png", "GPU Usage (%)", data1, data2, |m| m.gpu_usage, Some(100.0))?;
         self.draw_metric_chart("reports/network_comparison.png", "Network Usage (B/s)", data1, data2, |m| m.network_usage as f32, None)?;
 
-        // Копируем всё в историю
         let history_dir = format!("report_history/{}", self.run_id);
         let files_to_copy = [
             "app1_report.md", "app2_report.md", "comparison.md", "full_report.json",
@@ -64,8 +62,6 @@ impl ReportGenerator {
         Ok(())
     }
 
-    // Вспомогательные методы markdown и json скрыл для экономии места, 
-    // они остаются такими же, только добавь туда вывод GPU и Network, если хочешь.
     fn generate_markdown(&self, path: &str, app_name: &str, data: &[AppMetrics]) -> Result<()> {
         if data.is_empty() { return Ok(()); }
         let avg_cpu: f32 = data.iter().map(|d| d.cpu_usage).sum::<f32>() / data.len() as f32;
@@ -87,7 +83,6 @@ impl ReportGenerator {
         let avg_ram1: f32 = data1.iter().map(|d| d.ram_usage as f32).sum::<f32>() / data1.len() as f32;
         let avg_ram2: f32 = data2.iter().map(|d| d.ram_usage as f32).sum::<f32>() / data2.len() as f32;
         
-        // Form textual descriptions
         let cpu_winner = if avg_cpu1 < avg_cpu2 { "App 1" } else { "App 2" };
         let ram_winner = if avg_ram1 < avg_ram2 { "App 1" } else { "App 2" };
 
@@ -117,7 +112,6 @@ impl ReportGenerator {
         Ok(())
     }
 
-    // УМНАЯ ОТРИСОВКА ГРАФИКОВ (СГРУППИРОВАННЫЕ СТОЛБЦЫ)
     fn draw_metric_chart<F>(
         &self, 
         file_name: &str, 
@@ -137,7 +131,6 @@ impl ReportGenerator {
         let max1: f32 = data1.iter().map(&metric_extractor).fold(0.0_f32, f32::max);
         let max2: f32 = data2.iter().map(&metric_extractor).fold(0.0_f32, f32::max);
         
-        // Аналитика: кто победил? (У кого среднее значение меньше, тот эффективнее)
         let winner_text = if avg1 == 0.0 && avg2 == 0.0 {
             "No Data".to_string()
         } else if avg1 < avg2 {
@@ -153,7 +146,7 @@ impl ReportGenerator {
         let root = BitMapBackend::new(file_name, (900, 600)).into_drawing_area();
         root.fill(&WHITE)?;
 
-        let mut max_y = f32::max(max1, max2) * 1.2; // 20% отступа сверху
+        let mut max_y = f32::max(max1, max2) * 1.2;
         if max_y <= 0.0 { max_y = 10.0; } 
         if let Some(override_val) = max_y_override { max_y = override_val; }
 
@@ -162,7 +155,6 @@ impl ReportGenerator {
             .margin(25)
             .x_label_area_size(40)
             .y_label_area_size(80)
-            // Range 0 to 2 allows us to group: Average (0.0 - 1.0) and Peak (1.0 - 2.0)
             .build_cartesian_2d(0f32..2.0f32, 0f32..max_y)?;
 
         chart.configure_mesh()
@@ -177,11 +169,9 @@ impl ReportGenerator {
             })
             .draw()?;
 
-        // Цвета из прикрепленного скриншота пользователя: Синий (App 1) и Серый (App 2)
         let color_app1 = RGBColor(79, 129, 189); 
         let color_app2 = RGBColor(217, 217, 217);
 
-        // Отрисовка Average баров (App 1 и App 2)
         chart.draw_series(std::iter::once(PathElement::new(vec![], &color_app1)))?
             .label("App 1 (Start)")
             .legend(move |(x, y)| Rectangle::new([(x, y - 5), (x + 15, y + 10)], color_app1.filled()));
@@ -190,11 +180,9 @@ impl ReportGenerator {
             .label("App 2 (End)")
             .legend(move |(x, y)| Rectangle::new([(x, y - 5), (x + 15, y + 10)], color_app2.filled()));
 
-        // Group 1: Average [Ось X: 0.1 до 0.45 для App1, 0.55 до 0.9 для App2]
         chart.draw_series(std::iter::once(Rectangle::new([(0.15, 0.0), (0.45, avg1)], color_app1.filled())))?;
         chart.draw_series(std::iter::once(Rectangle::new([(0.55, 0.0), (0.85, avg2)], color_app2.filled())))?;
 
-        // Group 2: Peak [Ось X: 1.15 до 1.45 для App1, 1.55 до 1.85 для App2]
         chart.draw_series(std::iter::once(Rectangle::new([(1.15, 0.0), (1.45, max1)], color_app1.filled())))?;
         chart.draw_series(std::iter::once(Rectangle::new([(1.55, 0.0), (1.85, max2)], color_app2.filled())))?;
 

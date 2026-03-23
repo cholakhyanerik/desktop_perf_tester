@@ -5,12 +5,12 @@ use sysinfo::{Pid, ProcessesToUpdate, System, Networks};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppMetrics {
     pub time_sec: u64,
-    pub cpu_usage: f32, // в процентах
-    pub ram_usage: u64, // в мегабайтах
-    pub disk_read: u64, // в байтах
-    pub disk_write: u64, // в байтах
-    pub gpu_usage: f32, // в процентах (Общесистемная метрика/через nvidia-smi)
-    pub network_usage: u64, // в байтах (Общесистемная метрика)
+    pub cpu_usage: f32,
+    pub ram_usage: u64,
+    pub disk_read: u64,
+    pub disk_write: u64,
+    pub gpu_usage: f32,
+    pub network_usage: u64,
 }
 
 pub struct MetricsCollector {
@@ -42,20 +42,16 @@ impl MetricsCollector {
         
         let elapsed = self.start_time.elapsed().as_secs();
 
-        // Считаем общесистемный трафик (так как попроцессный сбор кроссплатформенно сложен)
         let mut total_network = 0;
         for (_, network_data) in &self.networks {
             let rx = network_data.received();
             let tx = network_data.transmitted();
-            let rx = if rx > 0 { rx } else { network_data.total_received() }; // fallback or actual rate
+            let rx = if rx > 0 { rx } else { network_data.total_received() };
             let tx = if tx > 0 { tx } else { network_data.total_transmitted() };
-            // Since we refresh per second, received() usually gives bytes since last refresh in sysinfo > 0.30
             total_network += rx + tx;
         }
 
-        // Пытаемся получить общесистемный GPU универсально (AMD/Intel/NVIDIA)
         let gpu_usage = if cfg!(target_os = "windows") {
-            // Универсальный метод для Windows через встроенные счетчики
             std::process::Command::new("powershell")
                 .args(&["-NoProfile", "-Command", "((Get-Counter '\\GPU Engine(*)\\Utilization Percentage' -ErrorAction SilentlyContinue).CounterSamples | Measure-Object -Property CookedValue -Sum).Sum"])
                 .output()
@@ -64,7 +60,6 @@ impl MetricsCollector {
                 .and_then(|s| s.trim().replace(',', ".").parse::<f32>().ok())
                 .unwrap_or(0.0)
         } else {
-            // Fallback для Linux / Mac
             std::process::Command::new("nvidia-smi")
                 .args(&["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
                 .output()
