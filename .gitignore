@@ -1,0 +1,21 @@
+# Rust and Cargo
+/target/
+**/*.rs.bk
+
+# Environment variables
+.env
+.env.local
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Generated reports and test data
+/reports/
+/report_history/

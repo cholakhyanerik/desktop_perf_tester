@@ -1,0 +1,17 @@
+[package]
+name = "desktop_perf_tester"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenvy = "^0.15"          # Для работы с .env
+sysinfo = "^0.38"          # Кроссплатформенный сбор метрик (актуальная версия)
+chrono = "^0.4"            # Работа со временем для истории отчетов
+plotters = "^0.3"          # Построение графиков
+serde = { version = "^1.0", features = ["derive"] } # Сериализация данных
+serde_json = "^1.0"        # JSON сериализация/десериализация
+anyhow = "^1.0"            # Удобная обработка ошибок
+thiserror = "^2.0"         # Декларативное описание ошибок
+
+[dev-dependencies]
+criterion = "^0.8"         # Бенчмарки
