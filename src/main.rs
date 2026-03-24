@@ -13,7 +13,9 @@ use process_manager::ProcessManager;
 use report_generator::ReportGenerator;
 
 fn main() -> Result<()> {
-    let _ = dotenv();
+    if let Err(e) = dotenv() {
+        eprintln!("⚠️ Warning: Failed to load .env: {}", e);
+    }
     
     let app1_path = env::var("APP_1_PATH").context("APP_1_PATH not found in .env or environment variables")?;
     let app2_path = env::var("APP_2_PATH").context("APP_2_PATH not found in .env or environment variables")?;
