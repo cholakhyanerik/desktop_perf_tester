@@ -10,6 +10,8 @@ use crate::metrics_collector::AppMetrics;
 #[derive(Serialize)]
 struct FullReport<'a> {
     run_id: &'a str,
+    app1_name: &'a str,
+    app2_name: &'a str,
     app1_metrics: &'a [AppMetrics],
     app2_metrics: &'a [AppMetrics],
 }
@@ -31,18 +33,18 @@ impl ReportGenerator {
         Ok(())
     }
 
-    pub fn generate_reports(&self, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
-        self.generate_markdown("reports/app1_report.md", "App 1", data1)?;
-        self.generate_markdown("reports/app2_report.md", "App 2", data2)?;
-        self.generate_comparison("reports/comparison.md", data1, data2)?;
-        self.generate_json("reports/full_report.json", data1, data2)?;
+    pub fn generate_reports(&self, name1: &str, name2: &str, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
+        self.generate_markdown("reports/app1_report.md", name1, data1)?;
+        self.generate_markdown("reports/app2_report.md", name2, data2)?;
+        self.generate_comparison("reports/comparison.md", name1, name2, data1, data2)?;
+        self.generate_json("reports/full_report.json", name1, name2, data1, data2)?;
 
-        self.draw_metric_chart("reports/cpu_comparison.png", "CPU Usage (%)", data1, data2, |m| m.cpu_usage, Some(100.0))?;
-        self.draw_metric_chart("reports/ram_comparison.png", "RAM Usage (MB)", data1, data2, |m| m.ram_usage as f32, None)?;
-        self.draw_metric_chart("reports/disk_read_comparison.png", "Disk Read (B/s)", data1, data2, |m| m.disk_read as f32, None)?;
-        self.draw_metric_chart("reports/disk_write_comparison.png", "Disk Write (B/s)", data1, data2, |m| m.disk_write as f32, None)?;
-        self.draw_metric_chart("reports/gpu_comparison.png", "GPU Usage (%)", data1, data2, |m| m.gpu_usage, Some(100.0))?;
-        self.draw_metric_chart("reports/network_comparison.png", "Network Usage (B/s)", data1, data2, |m| m.network_usage as f32, None)?;
+        self.draw_metric_chart("reports/cpu_comparison.png", "CPU Usage (%)", name1, name2, data1, data2, |m| m.cpu_usage, Some(100.0))?;
+        self.draw_metric_chart("reports/ram_comparison.png", "RAM Usage (MB)", name1, name2, data1, data2, |m| m.ram_usage as f32, None)?;
+        self.draw_metric_chart("reports/disk_read_comparison.png", "Disk Read (B/s)", name1, name2, data1, data2, |m| m.disk_read as f32, None)?;
+        self.draw_metric_chart("reports/disk_write_comparison.png", "Disk Write (B/s)", name1, name2, data1, data2, |m| m.disk_write as f32, None)?;
+        self.draw_metric_chart("reports/gpu_comparison.png", "GPU Usage (%)", name1, name2, data1, data2, |m| m.gpu_usage, Some(100.0))?;
+        self.draw_metric_chart("reports/network_comparison.png", "Network Usage (B/s)", name1, name2, data1, data2, |m| m.network_usage as f32, None)?;
 
         let history_dir = format!("report_history/{}", self.run_id);
         let files_to_copy = [
@@ -71,7 +73,7 @@ impl ReportGenerator {
         Ok(())
     }
 
-    fn generate_comparison(&self, path: &str, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
+    fn generate_comparison(&self, path: &str, name1: &str, name2: &str, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
         if data1.is_empty() || data2.is_empty() {
              fs::write(path, "# Comparison Report\nNo sufficient data to compare.")?;
              return Ok(());
@@ -83,31 +85,31 @@ impl ReportGenerator {
         let avg_ram1: f32 = data1.iter().map(|d| d.ram_usage as f32).sum::<f32>() / data1.len() as f32;
         let avg_ram2: f32 = data2.iter().map(|d| d.ram_usage as f32).sum::<f32>() / data2.len() as f32;
         
-        let cpu_winner = if avg_cpu1 < avg_cpu2 { "App 1" } else { "App 2" };
-        let ram_winner = if avg_ram1 < avg_ram2 { "App 1" } else { "App 2" };
+        let cpu_winner = if avg_cpu1 < avg_cpu2 { name1 } else { name2 };
+        let ram_winner = if avg_ram1 < avg_ram2 { name1 } else { name2 };
 
         let content = format!(
             "# Detailed Textual Comparison Report\n\n\
             This report contains the raw text descriptions comparing the metrics of both applications.\n\n\
             ## CPU Usage\n\
-            - **App 1 Avg**: {:.2}%\n\
-            - **App 2 Avg**: {:.2}%\n\
+            - **{} Avg**: {:.2}%\n\
+            - **{} Avg**: {:.2}%\n\
             - **Winner (Lower is better)**: {}\n\n\
             ## RAM Usage\n\
-            - **App 1 Avg**: {:.2} MB\n\
-            - **App 2 Avg**: {:.2} MB\n\
+            - **{} Avg**: {:.2} MB\n\
+            - **{} Avg**: {:.2} MB\n\
             - **Winner (Lower is better)**: {}\n\n\
             *Note: Read generated PNG charts for disk, network, and GPU comparison visualizations.*",
-            avg_cpu1, avg_cpu2, cpu_winner,
-            avg_ram1, avg_ram2, ram_winner
+            name1, avg_cpu1, name2, avg_cpu2, cpu_winner,
+            name1, avg_ram1, name2, avg_ram2, ram_winner
         );
 
         fs::write(path, content)?;
         Ok(())
     }
 
-    fn generate_json(&self, path: &str, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
-        let report = FullReport { run_id: &self.run_id, app1_metrics: data1, app2_metrics: data2 };
+    fn generate_json(&self, path: &str, name1: &str, name2: &str, data1: &[AppMetrics], data2: &[AppMetrics]) -> Result<()> {
+        let report = FullReport { run_id: &self.run_id, app1_name: name1, app2_name: name2, app1_metrics: data1, app2_metrics: data2 };
         fs::write(path, serde_json::to_string_pretty(&report)?)?;
         Ok(())
     }
@@ -116,6 +118,8 @@ impl ReportGenerator {
         &self, 
         file_name: &str, 
         base_title: &str, 
+        name1: &str,
+        name2: &str,
         data1: &[AppMetrics], 
         data2: &[AppMetrics], 
         metric_extractor: F,
@@ -134,9 +138,9 @@ impl ReportGenerator {
         let winner_text = if avg1 == 0.0 && avg2 == 0.0 {
             "No Data".to_string()
         } else if avg1 < avg2 {
-            format!("Winner: App 1 (Avg {:.2} vs {:.2})", avg1, avg2)
+            format!("Winner: {} (Avg {:.2} vs {:.2})", name1, avg1, avg2)
         } else if avg2 < avg1 {
-            format!("Winner: App 2 (Avg {:.2} vs {:.2})", avg2, avg1)
+            format!("Winner: {} (Avg {:.2} vs {:.2})", name2, avg2, avg1)
         } else {
             "Draw (Equal resource usage)".to_string()
         };
@@ -173,11 +177,11 @@ impl ReportGenerator {
         let color_app2 = RGBColor(217, 217, 217);
 
         chart.draw_series(std::iter::once(PathElement::new(vec![], &color_app1)))?
-            .label("App 1 (Start)")
+            .label(format!("{} (Start)", name1))
             .legend(move |(x, y)| Rectangle::new([(x, y - 5), (x + 15, y + 10)], color_app1.filled()));
             
         chart.draw_series(std::iter::once(PathElement::new(vec![], &color_app2)))?
-            .label("App 2 (End)")
+            .label(format!("{} (End)", name2))
             .legend(move |(x, y)| Rectangle::new([(x, y - 5), (x + 15, y + 10)], color_app2.filled()));
 
         chart.draw_series(std::iter::once(Rectangle::new([(0.15, 0.0), (0.45, avg1)], color_app1.filled())))?;

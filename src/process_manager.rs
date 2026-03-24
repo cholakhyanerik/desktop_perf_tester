@@ -17,12 +17,31 @@ pub struct ProcessManager {
 }
 
 impl ProcessManager {
+    fn resolve_path(path: &str) -> String {
+        if path.to_lowercase().ends_with(".lnk") {
+            let script = format!("(New-Object -COM WScript.Shell).CreateShortcut('{}').TargetPath", path);
+            if let Ok(output) = Command::new("powershell")
+                .args(&["-NoProfile", "-Command", &script])
+                .output()
+            {
+                let target = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !target.is_empty() {
+                    return target;
+                }
+            }
+        }
+        path.to_string()
+    }
+
     pub fn start_apps(path1: &str, path2: &str) -> Result<Self, ProcessError> {
-        let app1 = Command::new(path1)
+        let resolved_path1 = Self::resolve_path(path1);
+        let resolved_path2 = Self::resolve_path(path2);
+
+        let app1 = Command::new(&resolved_path1)
             .spawn()
             .map_err(|source| ProcessError::StartError { path: path1.to_string(), source })?;
             
-        let app2 = Command::new(path2)
+        let app2 = Command::new(&resolved_path2)
             .spawn()
             .map_err(|source| ProcessError::StartError { path: path2.to_string(), source })?;
 

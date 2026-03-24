@@ -2,7 +2,7 @@ mod process_manager;
 mod metrics_collector;
 mod report_generator;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use dotenvy::dotenv;
 use std::env;
 use std::thread;
@@ -17,15 +17,26 @@ fn main() -> Result<()> {
         eprintln!("⚠️ Warning: Failed to load .env: {}", e);
     }
     
-    let app1_path = env::var("APP_1_PATH").context("APP_1_PATH not found in .env or environment variables")?;
-    let app2_path = env::var("APP_2_PATH").context("APP_2_PATH not found in .env or environment variables")?;
+    let app1_path = env::var("APP_1_PATH").ok().filter(|s| !s.trim().is_empty());
+    let app2_path = env::var("APP_2_PATH").ok().filter(|s| !s.trim().is_empty());
+    let app3_path = env::var("APP_3_PATH").ok().filter(|s| !s.trim().is_empty());
+
+    let mut paths = vec![];
+    let mut names = vec![];
+    if let Some(p) = app1_path { paths.push(p); names.push("Dev"); }
+    if let Some(p) = app2_path { paths.push(p); names.push("New Branch"); }
+    if let Some(p) = app3_path { paths.push(p); names.push("MetaScalp"); }
+
+    if paths.len() < 2 {
+        anyhow::bail!("At least 2 app paths must be provided in .env (e.g. APP_1_PATH, APP_2_PATH, APP_3_PATH)");
+    }
 
     println!("🚀 Starting Performance Test...");
     
     let reporter = ReportGenerator::new();
     reporter.prepare_directories()?;
 
-    let mut pm = ProcessManager::start_apps(&app1_path, &app2_path)?;
+    let mut pm = ProcessManager::start_apps(&paths[0], &paths[1])?;
     
     let pid1 = pm.app1.id();
     let pid2 = pm.app2.id();
@@ -42,7 +53,7 @@ fn main() -> Result<()> {
     pm.kill_all();
 
     println!("📊 Generating reports...");
-    reporter.generate_reports(&collector.history_app1, &collector.history_app2)?;
+    reporter.generate_reports(names[0], names[1], &collector.history_app1, &collector.history_app2)?;
 
     println!("✅ Test fully completed!");
     Ok(())
