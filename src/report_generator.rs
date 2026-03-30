@@ -130,10 +130,10 @@ impl ReportGenerator {
     {
         if data1.is_empty() || data2.is_empty() { return Ok(()); }
 
-        let avg1: f32 = data1.iter().map(&metric_extractor).sum::<f32>() / data1.len() as f32;
-        let avg2: f32 = data2.iter().map(&metric_extractor).sum::<f32>() / data2.len() as f32;
-        let max1: f32 = data1.iter().map(&metric_extractor).fold(0.0_f32, f32::max);
-        let max2: f32 = data2.iter().map(&metric_extractor).fold(0.0_f32, f32::max);
+        let (sum1, max1) = data1.iter().map(&metric_extractor).fold((0.0_f32, 0.0_f32), |(sum, max), val| (sum + val, max.max(val)));
+        let (sum2, max2) = data2.iter().map(&metric_extractor).fold((0.0_f32, 0.0_f32), |(sum, max), val| (sum + val, max.max(val)));
+        let avg1 = sum1 / data1.len() as f32;
+        let avg2 = sum2 / data2.len() as f32;
         
         let winner_text = if avg1 == 0.0 && avg2 == 0.0 {
             "No Data".to_string()
@@ -198,5 +198,35 @@ impl ReportGenerator {
 
         root.present()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn create_mock_metrics() -> Vec<AppMetrics> {
+        vec![
+            AppMetrics { time_sec: 1, cpu_usage: 10.0, ram_usage: 100, disk_read: 0, disk_write: 0, gpu_usage: 0.0, network_usage: 0 },
+            AppMetrics { time_sec: 2, cpu_usage: 20.0, ram_usage: 200, disk_read: 0, disk_write: 0, gpu_usage: 0.0, network_usage: 0 },
+        ]
+    }
+
+    #[test]
+    fn test_generate_markdown() {
+        let generator = ReportGenerator::new();
+        let data = create_mock_metrics();
+        let path = "test_app1_report.md";
+        
+        let res = generator.generate_markdown(path, "TestApp", &data);
+        assert!(res.is_ok());
+        
+        let content = fs::read_to_string(path).unwrap();
+        assert!(content.contains("Report: TestApp"));
+        assert!(content.contains("CPU: 15.00%"));
+        assert!(content.contains("RAM: 150 MB"));
+        
+        let _ = fs::remove_file(path);
     }
 }

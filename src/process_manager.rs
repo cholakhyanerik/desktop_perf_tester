@@ -62,3 +62,14 @@ impl ProcessManager {
         println!("🛑 Test finished. Applications stopped.");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_path_normal() {
+        let path = "C:/Program Files/NormalApp/app.exe";
+        assert_eq!(ProcessManager::resolve_path(path), path);
+    }
+}

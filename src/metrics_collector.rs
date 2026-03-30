@@ -26,7 +26,7 @@ pub struct MetricsCollector {
 impl MetricsCollector {
     pub fn new(pid1: u32, pid2: u32) -> Self {
         Self {
-            sys: System::new_all(),
+            sys: System::new(),
             networks: Networks::new_with_refreshed_list(),
             start_time: Instant::now(),
             pid1: Pid::from_u32(pid1),
@@ -94,5 +94,25 @@ impl MetricsCollector {
                 network_usage: total_network,
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_metrics_creation() {
+        let metrics = AppMetrics {
+            time_sec: 10,
+            cpu_usage: 15.5,
+            ram_usage: 1024,
+            disk_read: 500,
+            disk_write: 200,
+            gpu_usage: 5.0,
+            network_usage: 1500,
+        };
+        assert_eq!(metrics.time_sec, 10);
+        assert_eq!(metrics.cpu_usage, 15.5);
     }
 }
