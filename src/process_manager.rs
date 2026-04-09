@@ -18,18 +18,27 @@ pub struct ProcessManager {
 
 impl ProcessManager {
     fn resolve_path(path: &str) -> String {
+        // Windows shortcut support (.lnk)
         if path.to_lowercase().ends_with(".lnk") {
-            let script = format!("(New-Object -COM WScript.Shell).CreateShortcut('{}').TargetPath", path);
+            let script = format!(
+                "(New-Object -COM WScript.Shell).CreateShortcut('{}').TargetPath",
+                path
+            );
+
             if let Ok(output) = Command::new("powershell")
                 .args(&["-NoProfile", "-Command", &script])
                 .output()
             {
-                let target = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let target = String::from_utf8_lossy(&output.stdout)
+                    .trim()
+                    .to_string();
+
                 if !target.is_empty() {
                     return target;
                 }
             }
         }
+
         path.to_string()
     }
 
@@ -39,20 +48,26 @@ impl ProcessManager {
 
         let app1 = Command::new(&resolved_path1)
             .spawn()
-            .map_err(|source| ProcessError::StartError { path: path1.to_string(), source })?;
-            
+            .map_err(|source| ProcessError::StartError {
+                path: path1.to_string(),
+                source,
+            })?;
+
         let app2 = Command::new(&resolved_path2)
             .spawn()
-            .map_err(|source| ProcessError::StartError { path: path2.to_string(), source })?;
+            .map_err(|source| ProcessError::StartError {
+                path: path2.to_string(),
+                source,
+            })?;
 
         println!("🟢 Applications started successfully.");
         Ok(Self { app1, app2 })
     }
 
     pub fn are_both_running(&mut self) -> bool {
-        let status1 = self.app1.try_wait().unwrap_or(Some(std::process::ExitStatus::default()));
-        let status2 = self.app2.try_wait().unwrap_or(Some(std::process::ExitStatus::default()));
-        
+        let status1 = self.app1.try_wait().ok().flatten();
+        let status2 = self.app2.try_wait().ok().flatten();
+
         status1.is_none() && status2.is_none()
     }
 
